@@ -1,0 +1,37 @@
+name: Setup question
+description: Stuck on a step in the lesson plan or the README.
+title: "[Setup]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Setup questions are welcome. Please say which step you are on, and remove any token, script URL, booking URL or form secret before posting.
+  - type: dropdown
+    id: track
+    attributes:
+      label: Which track
+      options:
+        - Track A (Apps Script)
+        - Track B (n8n)
+    validations:
+      required: true
+  - type: input
+    id: step
+    attributes:
+      label: Which step
+      placeholder: "Track A step 3, or Lesson plan Module 4"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: What you tried and what you saw.
+    validations:
+      required: true
+  - type: input
+    id: accounts
+    attributes:
+      label: Your accounts
+      placeholder: "Personal Google account, Capsule Free"

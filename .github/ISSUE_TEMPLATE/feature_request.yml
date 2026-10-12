@@ -1,0 +1,27 @@
+name: Idea or adaptation
+description: A change to the recipe, or a port to another CRM or scheduler.
+title: "[Idea]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do that the recipe does not do yet.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How you would change it. The recipe stays free, dependency-free and pasteable, so say how your idea keeps it that way.
+    validations:
+      required: true
+  - type: dropdown
+    id: build
+    attributes:
+      label: Would you build it?
+      options:
+        - "Yes, I can open a pull request"
+        - "Maybe, with some help"
+        - "No, just suggesting"

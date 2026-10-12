@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in Track A, Track B or the booking pages did not do what the README says.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Before you type anything, remember this issue is public: replace every Capsule token, Apps Script `/exec` URL, Google appointment URL and `FORM_SECRET` with `<redacted>`.
+  - type: dropdown
+    id: track
+    attributes:
+      label: Which part
+      options:
+        - Track A (Apps Script)
+        - Track B (n8n)
+        - Booking page (form)
+        - Docs or lesson plan
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, and what you saw in the page, the calendar and Capsule.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: accounts
+    attributes:
+      label: Your accounts
+      description: Google edition, Capsule plan, and n8n version for Track B.
+      placeholder: "Business Standard, Capsule Growth, n8n Cloud 1.x"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or execution output
+      description: Apps Script Executions or the failing n8n node's output, with secrets removed.
+      render: shell
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Secrets
+      options:
+        - label: I have removed tokens, script URLs, booking URLs and form secrets from this issue.
+          required: true

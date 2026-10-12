@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Why it works this way
+    url: https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/
+    about: The article behind the recipe, with the design, the trade-offs and the timings.
+  - name: What Google's booking page cannot do
+    url: https://4quadrantai.com/articles/google-appointment-schedule-webhook-redirect-prefill/
+    about: No webhook, no redirect, no prefill, and what each Google edition gets.
