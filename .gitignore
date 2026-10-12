@@ -1,0 +1,15 @@
+# Secrets and local settings. Never commit tokens, script URLs or form secrets.
+.env
+.env.*
+*.local.*
+.clasprc.json
+.clasp.json
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# If you add tooling later
+node_modules/

@@ -1,10 +1,35 @@
-# capsule-google-booking
+# Capsule Google Booking
 
-Free appointment booking for Capsule CRM, built on the booking pages Google Workspace already gives you. Two ways to run it: a Google Apps Script inside your own account for one person, or two n8n workflows for a team.
+**Free appointment scheduling for Capsule CRM, built on the Google Calendar appointment schedules (booking pages) you already have.** Capture the visitor and their UTM attribution first, then show Google's booking page, then watch the calendar and move the Capsule opportunity to *Meeting Booked*. Runs as one Google Apps Script for a single person, or two n8n workflows for a team.
+
+[![MIT licence](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![Track A: running in production](https://img.shields.io/badge/Track%20A-running%20in%20production-2ea44f.svg)](#status)
+[![Track B: untested template](https://img.shields.io/badge/Track%20B-untested%20template-lightgrey.svg)](#status)
+[![Google Apps Script](https://img.shields.io/badge/Google%20Apps%20Script-V8-4285F4.svg)](appsscript/)
+[![n8n](https://img.shields.io/badge/n8n-workflows-EA4B71.svg)](workflows/)
+
+![A booking page: a short form asks for a name, an email, the length of the call and what it is about, then the form is replaced by Google's appointment booking page in a frame.](docs/capture-first-then-book.gif)
 
 A visitor fills in a short form on **your** page, which captures who they are and which ad or link brought them. The page then shows a Google appointment page, and the enquiry is written into Capsule. When the slot lands on the calendar, the watcher moves the Capsule opportunity to **Meeting Booked**, tags it, and writes a note with the time, the Meet link and the booking form answers. Cancellations are caught too.
 
 Capture first, then book, then watch the calendar. The booking page never has to carry the attribution, which is the thing Google's page cannot do.
+
+## Contents
+
+- [Status](#status)
+- [Two tracks](#two-tracks)
+- [What it costs](#what-it-costs)
+- [What you need](#what-you-need)
+- [Track A in about 45 minutes](#track-a-in-about-45-minutes)
+- [Track B in about 90 minutes](#track-b-in-about-90-minutes)
+- [How it works](#how-it-works)
+- [What you lose compared with a paid scheduler](#what-you-lose-compared-with-a-paid-scheduler)
+- [Limits and failure modes](#limits-and-failure-modes)
+- [Adapting it to another CRM](#adapting-it-to-another-crm)
+- [FAQ](#faq)
+- [Why I built it](#why-i-built-it)
+- [Contributing, security and citing](#contributing-security-and-citing)
+- [Licence](#licence)
 
 ## Status
 
@@ -13,7 +38,7 @@ Capture first, then book, then watch the calendar. The booking page never has to
 | Track A (solo, Apps Script) | Running on timmybrown.co.nz since 12 October 2026. A test booking reached Capsule at Meeting Booked two seconds after Google confirmed the slot; the cancellation tag arrived thirty seconds after cancelling from the invite. |
 | Track B (team, n8n) | Built from the same design, JSON validated, not yet run against live accounts. The checks in [docs/LESSON-PLAN.md](docs/LESSON-PLAN.md) are what prove it. |
 
-![Capture first, then book, then watch the calendar](docs/booking-flow.svg)
+Changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Two tracks
 
@@ -61,6 +86,11 @@ The edition note: Google's premium scheduling features (several booking pages pe
 
 ## How it works
 
+![Six steps: your page captures the visitor, the brain writes a person and an opportunity into Capsule, the page shows Google's booking page, the booking lands on Google Calendar, the calendar wakes the brain, and Capsule moves the opportunity to Meeting Booked.](docs/booking-flow.svg)
+
+<details>
+<summary>The same flow as text</summary>
+
 ```
 your page /book/            the brain (Apps Script or n8n)            Capsule
   step 1 form  ───POST────▶ find or create person ──────────────────▶ Person (+ Attribution DataTag)
@@ -75,6 +105,8 @@ your page /book/            Google
                             move to "Meeting Booked" ───────────────▶ tag booking:<type>, note with time + Meet link
                             cancelled? ─────────────────────────────▶ tag booking:cancelled, note
 ```
+
+</details>
 
 Why watch the calendar instead of the booking page: Google's appointment pages have no webhook, no redirect after booking and no URL prefill. The calendar event is the only reliable signal, and the Calendar API can be read by anyone with access to the calendar. On Track A, Google fires the script the moment the calendar changes.
 
@@ -99,13 +131,47 @@ If any of those matter more than the saving, keep your scheduler and use only th
 - Capsule search is fuzzy, so people are only reused on an exact email match.
 - Apps Script quotas (trigger runtime per day, external requests per day) are far above what one person's bookings need.
 
-## Adapting it
+## Adapting it to another CRM
 
-Any CRM with a REST API will do. Track A: replace the Capsule helpers at the bottom of `Code.gs`. Track B: swap the eight `Capsule:` HTTP nodes in each workflow. The Google side and the form do not change.
+Any CRM with a REST API will do. Track A: replace the Capsule helpers at the bottom of `Code.gs`. Track B: swap the eight `Capsule:` HTTP nodes in each workflow. The Google side and the form do not change. The CRM has to be able to find a person by email, create one, open a deal, move its stage and add a note.
+
+## FAQ
+
+**Does Google Calendar appointment scheduling have a webhook?**
+No. Google's booking page tells nobody about a booking. This project watches the calendar instead: an installable calendar trigger in Apps Script, or a short poll in n8n, reads what changed through the Calendar API and treats a new event with an outside guest as a booking.
+
+**Can Google's booking page redirect to a thank-you page or be prefilled from the URL?**
+No to both. That is why the form comes first: the attribution is captured on your page before the visitor sees Google's, and conversions fire from the watcher rather than from a thank-you page. The visitor types their name and email a second time on Google's form.
+
+**Is this a free Calendly alternative?**
+For booking a slot and getting the booking into Capsule with its source, yes. It gives up SMS reminders, Google's form prefill and an instant thank-you page. See [what you lose](#what-you-lose-compared-with-a-paid-scheduler).
+
+**Do I need Google Workspace?**
+No. A personal Google account can create one appointment schedule. Several booking pages per person, automatic reminders and multi-calendar clash checks need a paid edition, listed under [what it costs](#what-it-costs).
+
+**Does it work on Capsule's Free plan?**
+Capsule documents API access on every plan. Free allows five custom fields and one pipeline, so keep the attribution in the note and skip the Attribution DataTag.
+
+**Can I put the booking link in Transpond emails?**
+Yes. Point the link at your own `/book/` page with the campaign in the UTM parameters, not at Google's URL, so the click is captured the same way an ad click is. Follow-up can hang off the *Meeting Booked* milestone in Capsule's own workflow automation.
+
+**Does Google's booking page load inside an iframe?**
+Yes. The Website embed URL from the schedule's Share menu loads in a frame, and both booking pages also show a link that opens it in a new tab.
+
+**Can I use it with HubSpot, Pipedrive or another CRM?**
+Yes, by swapping the CRM calls. See [adapting it](#adapting-it-to-another-crm).
 
 ## Why I built it
 
-The reasoning, the gap in the two marketplaces this falls into, and what each tool pays me are in the article that accompanies this repo: [Free Appointment Scheduling for Capsule CRM](https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/) on 4quadrantai.com, with the three things Google's booking page cannot do written up [on their own](https://4quadrantai.com/articles/google-appointment-schedule-webhook-redirect-prefill/). This repository carries no affiliate links.
+The reasoning, the gap in the two marketplaces this falls into, and what each tool pays me are in the article that accompanies this repo: [Free Appointment Scheduling for Capsule CRM](https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/) on 4quadrantai.com. The three things Google's booking page cannot do are written up [on their own](https://4quadrantai.com/articles/google-appointment-schedule-webhook-redirect-prefill/). This repository carries no affiliate links.
+
+Built by [Timmy Brown](https://timmybrown.co.nz), a marketer in New Zealand.
+
+## Contributing, security and citing
+
+- **Contributing.** Issues and pull requests are welcome; read [CONTRIBUTING.md](CONTRIBUTING.md) first. Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
+- **Security.** Never paste a Capsule token, a Google URL with keys in it or a form secret into an issue. Report a vulnerability privately as described in [SECURITY.md](SECURITY.md).
+- **Citing.** GitHub's "Cite this repository" button reads [CITATION.cff](CITATION.cff).
 
 ## Licence
 

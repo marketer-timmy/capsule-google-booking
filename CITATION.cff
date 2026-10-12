@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this recipe or write about it, please cite it as below."
+type: software
+title: "Capsule Google Booking: free appointment scheduling for Capsule CRM on Google Calendar booking pages"
+abstract: >-
+  A recipe for free appointment scheduling in Capsule CRM using Google Calendar
+  appointment schedules. A form on your own page captures the visitor and their
+  UTM attribution, Google's booking page takes the slot, and a calendar watcher
+  moves the Capsule opportunity to Meeting Booked. Runs as one Google Apps Script
+  for a single person or two n8n workflows for a team.
+authors:
+  - family-names: Brown
+    given-names: Timmy
+    website: "https://timmybrown.co.nz"
+repository-code: "https://github.com/marketer-timmy/capsule-google-booking"
+url: "https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/"
+license: MIT
+version: 0.1.0
+date-released: "2026-10-12"
+keywords:
+  - Capsule CRM
+  - Google Calendar
+  - appointment scheduling
+  - booking page
+  - Google Apps Script
+  - n8n
+  - UTM attribution
+  - Calendly alternative
