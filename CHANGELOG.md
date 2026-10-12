@@ -4,6 +4,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ## [Unreleased]
 
+### Added
+
+- README: "The tools it runs on", with disclosed affiliate links to Capsule CRM and n8n through the author's disclosure pages.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added

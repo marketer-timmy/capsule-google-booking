@@ -27,6 +27,7 @@ Capture first, then book, then watch the calendar. The booking page never has to
 - [Limits and failure modes](#limits-and-failure-modes)
 - [Adapting it to another CRM](#adapting-it-to-another-crm)
 - [FAQ](#faq)
+- [The tools it runs on](#the-tools-it-runs-on)
 - [Why I built it](#why-i-built-it)
 - [Contributing, security and citing](#contributing-security-and-citing)
 - [Licence](#licence)
@@ -161,9 +162,20 @@ Yes. The Website embed URL from the schedule's Share menu loads in a frame, and 
 **Can I use it with HubSpot, Pipedrive or another CRM?**
 Yes, by swapping the CRM calls. See [adapting it](#adapting-it-to-another-crm).
 
+## The tools it runs on
+
+| Tool | What it does here | Link |
+|---|---|---|
+| Capsule CRM | Holds the person, the opportunity, the Attribution DataTag and the booking notes | [capsulecrm.com](https://timmybrown.co.nz/go/capsule-crm/) |
+| n8n | Runs Track B for a team; not needed for Track A | [n8n.io](https://timmybrown.co.nz/go/n8n/) |
+| Google appointment schedules | The booking page itself, free with any Google account | [Google Calendar Help](https://support.google.com/calendar/answer/10729749) |
+| Google Apps Script | Runs Track A in your own Google account, free | [script.google.com](https://script.google.com) |
+
+The Capsule and n8n links are affiliate links: they go through a disclosure page on my site, and if you sign up through them I earn a commission at no cost to you. The recipe works the same without them, and what each programme pays is listed in [the article](https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/#what-each-one-pays-me).
+
 ## Why I built it
 
-The reasoning, the gap in the two marketplaces this falls into, and what each tool pays me are in the article that accompanies this repo: [Free Appointment Scheduling for Capsule CRM](https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/) on 4quadrantai.com. The three things Google's booking page cannot do are written up [on their own](https://4quadrantai.com/articles/google-appointment-schedule-webhook-redirect-prefill/). This repository carries no affiliate links.
+The reasoning, the gap in the two marketplaces this falls into, and what each tool pays me are in the article that accompanies this repo: [Free Appointment Scheduling for Capsule CRM](https://4quadrantai.com/articles/free-appointment-scheduling-capsule-crm/) on 4quadrantai.com. The three things Google's booking page cannot do are written up [on their own](https://4quadrantai.com/articles/google-appointment-schedule-webhook-redirect-prefill/). The only affiliate links in this repository are the two disclosed under [the tools it runs on](#the-tools-it-runs-on).
 
 Built by [Timmy Brown](https://timmybrown.co.nz), a marketer in New Zealand.
 

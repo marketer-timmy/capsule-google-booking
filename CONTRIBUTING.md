@@ -24,7 +24,7 @@ Import the JSON into your own n8n, make the change there, export the workflow an
 
 ## What will not be merged
 
-- Affiliate links, tracking pixels or anything that phones home.
+- Affiliate links (the README's two disclosed ones are the maintainer's), tracking pixels or anything that phones home.
 - Real ids, tokens or URLs from anyone's accounts.
 - New dependencies, build tools or frameworks for the booking pages.
 
