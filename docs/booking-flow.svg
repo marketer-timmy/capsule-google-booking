@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-labelledby="t d" font-family="system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="12">
+  <title id="t">Capture first, then book, then watch the calendar</title>
+  <desc id="d">A visitor fills in a form on your page, which writes a person and an opportunity into Capsule. The page then shows Google's booking page in a frame. The booking lands on the host's Google Calendar, which wakes the script, and the script moves the Capsule opportunity to Meeting Booked.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#333333"/></marker>
+  </defs>
+  <rect width="960" height="440" fill="#ffffff"/>
+  <rect x="20" y="40" width="290" height="128" rx="8" fill="#f4f4f2" stroke="#8a8a85"/>
+  <text x="36" y="64" font-weight="600" font-size="13" fill="#1a1a1a">1. Your page, /book/</text>
+  <text x="36" y="86" fill="#1a1a1a">Short form: name, email, meeting type,</text>
+  <text x="36" y="102" fill="#1a1a1a">what it is about.</text>
+  <text x="36" y="126" fill="#555555">UTM, click ids and landing URL</text>
+  <text x="36" y="142" fill="#555555">read from the address bar.</text>
+  <rect x="335" y="40" width="290" height="128" rx="8" fill="#f4f4f2" stroke="#8a8a85"/>
+  <text x="351" y="64" font-weight="600" font-size="13" fill="#1a1a1a">2. The brain</text>
+  <text x="351" y="86" fill="#1a1a1a">Google Apps Script (one person)</text>
+  <text x="351" y="102" fill="#1a1a1a">or two n8n workflows (a team).</text>
+  <text x="351" y="126" fill="#555555">Finds or creates the person,</text>
+  <text x="351" y="142" fill="#555555">opens the opportunity.</text>
+  <rect x="650" y="40" width="290" height="128" rx="8" fill="#eef3ee" stroke="#5f7f5f"/>
+  <text x="666" y="64" font-weight="600" font-size="13" fill="#1a1a1a">3. Capsule</text>
+  <text x="666" y="86" fill="#1a1a1a">Person with an Attribution DataTag.</text>
+  <text x="666" y="102" fill="#1a1a1a">Opportunity at New, plus a note.</text>
+  <text x="666" y="126" fill="#555555">Source, campaign and click id</text>
+  <text x="666" y="142" fill="#555555">on the record.</text>
+  <rect x="20" y="250" width="290" height="128" rx="8" fill="#f4f4f2" stroke="#8a8a85"/>
+  <text x="36" y="274" font-weight="600" font-size="13" fill="#1a1a1a">4. Same page, second step</text>
+  <text x="36" y="296" fill="#1a1a1a">Google's booking page in a frame.</text>
+  <text x="36" y="312" fill="#1a1a1a">The visitor picks a slot.</text>
+  <text x="36" y="336" fill="#555555">Name and email typed a second time:</text>
+  <text x="36" y="352" fill="#555555">Google cannot be prefilled.</text>
+  <rect x="335" y="250" width="290" height="128" rx="8" fill="#f4f4f2" stroke="#8a8a85"/>
+  <text x="351" y="274" font-weight="600" font-size="13" fill="#1a1a1a">5. Google Calendar</text>
+  <text x="351" y="296" fill="#1a1a1a">The event lands on the host's calendar</text>
+  <text x="351" y="312" fill="#1a1a1a">with the guest and the Meet link.</text>
+  <text x="351" y="336" fill="#555555">Google sends the invite, reschedule</text>
+  <text x="351" y="352" fill="#555555">and cancel links.</text>
+  <rect x="650" y="250" width="290" height="128" rx="8" fill="#eef3ee" stroke="#5f7f5f"/>
+  <text x="666" y="274" font-weight="600" font-size="13" fill="#1a1a1a">6. Capsule, again</text>
+  <text x="666" y="296" fill="#1a1a1a">Opportunity moved to Meeting Booked.</text>
+  <text x="666" y="312" fill="#1a1a1a">Tag booking:&lt;type&gt;, note with time</text>
+  <text x="666" y="328" fill="#1a1a1a">and the Meet link.</text>
+  <text x="666" y="352" fill="#555555">Cancelled on the calendar:</text>
+  <text x="666" y="368" fill="#555555">tag booking:cancelled.</text>
+  <line x1="310" y1="104" x2="333" y2="104" stroke="#8a8a85" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="625" y1="104" x2="648" y2="104" stroke="#8a8a85" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="310" y1="314" x2="333" y2="314" stroke="#8a8a85" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="625" y1="314" x2="648" y2="314" stroke="#8a8a85" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="165" y1="168" x2="165" y2="248" stroke="#8a8a85" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow)"/>
+  <text x="177" y="212" fill="#555555">form hidden, frame shown</text>
+  <path d="M 480 250 L 480 170" fill="none" stroke="#8a8a85" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="492" y="204" fill="#555555">the calendar wakes the brain</text>
+  <text x="492" y="220" fill="#555555">(calendar trigger, or a 2-minute poll)</text>
+  <text x="20" y="420" fill="#555555">The booking page never carries the attribution. The form before it does, and the calendar after it is the one signal Google gives reliably.</text>
+</svg>
