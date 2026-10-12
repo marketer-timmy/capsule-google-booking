@@ -1,0 +1,793 @@
+{
+  "name": "Capsule booking: 1 Router (form to Google booking page)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Booking router (step 1 of the form)\nReceives the form from `form/book.html`, answers within a second with the right Google appointment page, then writes the enquiry into Capsule.\n\n**Flow:** Webhook, then clean and validate, then pick a host (round robin per meeting type), then reply with the booking page URL, then find or create the Capsule person (exact email match), then reuse the newest open opportunity or create one at *New*, then tag it and add a note carrying every attribution field.\n\n**Set up**\n1. Create a **Header Auth** credential: name `Authorization`, value `Bearer <your Capsule personal access token>`. Select it on every Capsule node.\n2. Edit the **Settings** node: hosts, booking page links, pipeline and milestone names, and the DataTag field names once the DataTag exists.\n3. Activate, then copy the production webhook URL into `N8N_WEBHOOK` in `form/book.html`.\n4. Replace `*` in the Webhook node's *Allowed Origins (CORS)* with your site's origin.\n\nPairs with the **Calendar watcher** workflow, which moves the opportunity to *Meeting Booked* when the event appears on the host's calendar.\n\nSchema, form and docs: the `capsule-google-booking` repository (link in the template description).",
+        "height": 560,
+        "width": 560,
+        "color": 1
+      },
+      "id": "2950b67b-25f0-4d95-b805-1e4d6a152894",
+      "name": "Sticky Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Capture\nThe form posts JSON. A honeypot field called `website` catches bots. Nothing here depends on Capsule.",
+        "height": 100,
+        "width": 520,
+        "color": 7
+      },
+      "id": "b0ea220b-6ac1-4792-85f1-bc60a385d742",
+      "name": "Sticky Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        620,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Reply first\nThe visitor gets the booking page before any CRM call runs, so a Capsule outage never blocks a booking.",
+        "height": 100,
+        "width": 480,
+        "color": 7
+      },
+      "id": "6ef34209-6798-44dc-ae9f-2c531c1005f6",
+      "name": "Sticky Note 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Person\nCapsule search is fuzzy. We only reuse a person on an exact email match; otherwise we create one with tags and the Attribution DataTag.",
+        "height": 100,
+        "width": 740,
+        "color": 7
+      },
+      "id": "111bf293-4ff0-4399-aabc-4a6fe9ccce48",
+      "name": "Sticky Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1700,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Opportunity and note\nOne open opportunity per person in the pipeline. Repeat enquiries add a note instead of a duplicate.",
+        "height": 100,
+        "width": 1000,
+        "color": 7
+      },
+      "id": "844d80da-5ca4-42cf-8e2f-95d7d7991c18",
+      "name": "Sticky Note 5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "book",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "id": "48edbe47-9f28-4321-8c1f-7584f9bd0365",
+      "name": "Booking form (POST /book)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        620,
+        300
+      ],
+      "webhookId": "61d7bb4c-ba59-4cb8-acfb-078f91c1bd23"
+    },
+    {
+      "parameters": {
+        "jsCode": "// One booking request per execution. Cleans the form fields, checks the basics,\n// and builds the attribution object from whatever the form captured.\nconst body = $input.first().json.body || {};\nconst s = v => (v === undefined || v === null) ? '' : String(v).trim();\nconst email = s(body.email).toLowerCase();\nconst first_name = s(body.first_name || body.firstName).slice(0, 80);\nconst last_name = s(body.last_name || body.lastName).slice(0, 80);\nconst phone = s(body.phone).replace(/[^\\d+]/g, '').slice(0, 20);\nconst meeting_type = s(body.meeting_type).toLowerCase() || 'discovery';\nconst errors = [];\nif (s(body.website)) errors.push('spam');            // honeypot: humans leave it empty\nif (!first_name) errors.push('first_name');\nif (!/^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$/.test(email)) errors.push('email');\nconst keys = ['utm_source','utm_medium','utm_campaign','utm_content','utm_term',\n              'gclid','gbraid','wbraid','fbclid','ttclid','msclkid','landing_url','referrer'];\nconst attribution = {};\nfor (const k of keys) { const v = s(body[k]); if (v) attribution[k] = v.slice(0, 250); }\nconst booking_key = s(body.booking_key).slice(0, 40)\n  || ('bk_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8));\nreturn [{ json: {\n  valid: errors.length === 0,\n  errors,\n  first_name, last_name, email, phone, meeting_type,\n  need: s(body.need).slice(0, 1000),\n  consent: body.consent === true || s(body.consent) === 'true' || s(body.consent) === 'on',\n  attribution,\n  booking_key,\n  received_at: new Date().toISOString(),\n}}];"
+      },
+      "id": "5c59a4cf-59ac-4667-8d47-0a7862c4d20d",
+      "name": "Normalise and validate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bec6c73b-67b4-4bc5-a2a3-733e9617edd7",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ac17b62d-fb3c-490f-a849-882ad4b1599f",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1060,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, errors: $json.errors }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "417378e1-f4a8-4efa-90f6-698c2aa4110f",
+      "name": "Reject (400)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1280,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// EDIT THIS NODE. Everything site-specific lives here.\nconst settings = {\n  capsule_base: 'https://api.capsulecrm.com/api/v2',\n  pipeline_name: 'Enquiries',          // the Capsule pipeline bookings land in\n  new_milestone_name: 'New',           // milestone for a brand-new enquiry\n  tags: ['form:booking'],              // tags applied to every person and opportunity this creates\n  attribution_tag: 'Attribution',      // the DataTag that owns the fields below (capsule/SCHEMA.md)\n  // Names of the text fields inside that DataTag. Leave the list empty until the DataTag exists;\n  // the attribution still goes into the note either way.\n  attribution_fields: [\n    // 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'gclid', 'fbclid', 'landing_url', 'booking_key',\n  ],\n  meeting_types: {\n    discovery: { label: 'Discovery call (15 min)' },\n    strategy:  { label: 'Strategy session (30 min)' },\n  },\n  // One entry per person who takes bookings. booking_pages are the Google appointment\n  // schedule links. Share > Website embed gives the long calendar.google.com form, which\n  // is the one that loads inside the iframe on your page.\n  hosts: [\n    { name: 'Host One', email: 'one@example.co.nz',\n      booking_pages: {\n        discovery: 'https://calendar.google.com/calendar/appointments/schedules/REPLACE_ONE_DISCOVERY',\n        strategy:  'https://calendar.google.com/calendar/appointments/schedules/REPLACE_ONE_STRATEGY',\n      } },\n    // { name: 'Host Two', email: 'two@example.co.nz', booking_pages: { discovery: '...', strategy: '...' } },\n  ],\n};\nreturn $input.all().map(i => ({ json: { ...i.json, settings } }));"
+      },
+      "id": "281df243-a4d5-476d-9cd4-cf93dee148bb",
+      "name": "Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Round robin per meeting type. The counter lives in workflow static data, so it\n// survives between executions. Hosts without a page for this type are skipped.\nconst lead = $input.first().json;\nconst st = lead.settings;\nconst types = Object.keys(st.meeting_types);\nconst type = st.meeting_types[lead.meeting_type] ? lead.meeting_type : types[0];\nconst eligible = st.hosts.filter(h => h.booking_pages && h.booking_pages[type]);\nif (!eligible.length) throw new Error(`No host has a booking page for meeting type \"${type}\". Check the Settings node.`);\nconst sd = $getWorkflowStaticData('global');\nsd.round_robin = sd.round_robin || {};\nconst n = sd.round_robin[type] || 0;\nconst host = eligible[n % eligible.length];\nsd.round_robin[type] = (n + 1) % eligible.length;\nreturn [{ json: {\n  ...lead,\n  meeting_type: type,\n  meeting_label: st.meeting_types[type].label,\n  host: { name: host.name, email: host.email },\n  booking_url: host.booking_pages[type],\n}}];"
+      },
+      "id": "a0e7888b-896e-4470-85ae-4dc872ec226b",
+      "name": "Pick host and booking page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, booking_key: $json.booking_key, booking_url: $json.booking_url, host_name: $json.host.name, meeting_label: $json.meeting_label }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              }
+            ]
+          }
+        }
+      },
+      "id": "2d4b2a3c-5473-4cef-94e8-1754ccaa3baf",
+      "name": "Reply with booking page (200)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1720,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.settings.capsule_base }}/parties/search?q={{ encodeURIComponent($json.email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "e1df192c-d1c9-42a0-840e-f27ea3c9fdcf",
+      "name": "Capsule: search person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1940,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Capsule search is fuzzy, so we insist on an exact email match before reusing a person.\nconst lead = $('Pick host and booking page').first().json;\nconst res = $input.first().json || {};\nconst parties = Array.isArray(res.parties) ? res.parties : [];\nconst match = parties.find(p => (p.emailAddresses || []).some(e => (e.address || '').toLowerCase() === lead.email));\nconst st = lead.settings;\nconst tags = [...st.tags, `booking:${lead.meeting_type}`];\nif (lead.attribution.utm_source) tags.push(('src:' + lead.attribution.utm_source).slice(0, 50));\nconst values = { ...lead.attribution, booking_key: lead.booking_key };\n// Capsule accepts a field by name when the DataTag it belongs to is named alongside it.\nconst fields = (st.attribution_fields || [])\n  .filter(name => values[name])\n  .map(name => ({ definition: { name, tag: st.attribution_tag }, value: String(values[name]).slice(0, 250) }));\nif (fields.length && st.attribution_tag) tags.push(st.attribution_tag);\nconst unique = [...new Set(tags)];\nconst create_body = { party: {\n  type: 'person',\n  firstName: lead.first_name,\n  lastName: lead.last_name || undefined,\n  emailAddresses: [{ type: 'Work', address: lead.email }],\n  phoneNumbers: lead.phone ? [{ type: 'Mobile', number: lead.phone }] : undefined,\n  tags: unique.map(name => ({ name })),\n  fields: fields.length ? fields : undefined,\n}};\nreturn [{ json: { ...lead, party_id: match ? match.id : null, tags: unique, create_body, search_failed: !!res.error } }];"
+      },
+      "id": "5f937d6b-527b-4260-961f-ae66f86a4f1f",
+      "name": "Match person by email",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "313517d2-e308-4866-b5c7-6e9f5f7f4552",
+              "leftValue": "={{ !!$json.party_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e682fb88-3dd2-42c0-88f7-dd11a3f14d64",
+      "name": "Person found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2380,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.capsule_base }}/parties",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.create_body) }}"
+      },
+      "id": "4fcb3f47-124b-45f5-b99d-3c4e8365c95b",
+      "name": "Capsule: create person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        380
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reached from both branches: an existing match, or the person Capsule just created.\nconst base = $('Match person by email').first().json;\nconst inp = $input.first().json || {};\nconst party_id = base.party_id || (inp.party && inp.party.id) || null;\nif (!party_id) throw new Error('No Capsule person id. Response was: ' + JSON.stringify(inp).slice(0, 300));\nreturn [{ json: { ...base, party_id, person_created: !base.party_id } }];"
+      },
+      "id": "582592ee-0de1-4bb5-aa36-1399f2f2396a",
+      "name": "Resolve person",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.settings.capsule_base }}/parties/{{ $json.party_id }}/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "11d9d853-afef-427d-a11c-87e443e8001a",
+      "name": "Capsule: list opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3040,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Resolve person').first().json.settings.capsule_base }}/milestones?perPage=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "4a0c17d2-f709-45c2-8b85-bc87d7e70099",
+      "name": "Capsule: list milestones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3260,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reuse the newest open opportunity in the pipeline, otherwise prepare a new one.\nconst lead = $('Resolve person').first().json;\nconst st = lead.settings;\nconst opps = ($('Capsule: list opportunities').first().json || {}).opportunities || [];\nconst milestones = ($input.first().json || {}).milestones || [];\nconst inPipeline = m => !m.pipeline || !st.pipeline_name\n  || (m.pipeline.name || '').toLowerCase() === st.pipeline_name.toLowerCase();\nconst pipelineMs = milestones.filter(inPipeline);\nconst newMs = pipelineMs.find(m => (m.name || '').toLowerCase() === st.new_milestone_name.toLowerCase()) || pipelineMs[0];\nconst ids = new Set(pipelineMs.map(m => m.id));\nconst open = opps\n  .filter(o => !o.closedOn && (!o.milestone || ids.size === 0 || ids.has(o.milestone.id)))\n  .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0];\nif (!open && !newMs) throw new Error(`No milestone \"${st.new_milestone_name}\" found in pipeline \"${st.pipeline_name}\". Create the pipeline first (capsule/SCHEMA.md).`);\nconst attr = Object.entries(lead.attribution).map(([k, v]) => `${k}: ${v}`).join('\\n');\nconst note = [\n  `Booking requested: ${lead.meeting_label}`,\n  `Host offered: ${lead.host.name}`,\n  lead.need ? `What they need: ${lead.need}` : null,\n  `Booking key: ${lead.booking_key}`,\n  attr ? `Attribution:\\n${attr}` : 'Attribution: nothing captured',\n  `Received: ${lead.received_at}`,\n].filter(Boolean).join('\\n');\nconst name = `${lead.first_name} ${lead.last_name}`.trim() + ` - ${lead.meeting_label}`;\nreturn [{ json: {\n  ...lead,\n  opportunity_id: open ? open.id : null,\n  create_opportunity: !open,\n  opportunity_create_body: open ? null : { opportunity: {\n    party: { id: lead.party_id },\n    name: name.slice(0, 100),\n    milestone: { id: newMs.id },\n    tags: lead.tags.map(t => ({ name: t })),\n  } },\n  note,\n}}];"
+      },
+      "id": "cdf58ca9-1e5c-4285-8cf9-818ae32ff9da",
+      "name": "Decide opportunity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3480,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4af7ab90-522b-4dc1-8223-26b96b6fe613",
+              "leftValue": "={{ $json.create_opportunity }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "de2bfd9f-2152-458d-85b4-2dc62c50e676",
+      "name": "Create opportunity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3700,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.capsule_base }}/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.opportunity_create_body) }}"
+      },
+      "id": "db707919-58ef-4d5f-994e-c10b62b68b09",
+      "name": "Capsule: create opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3920,
+        80
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Reached from both branches: the open opportunity we found, or the one just created.\nconst base = $('Decide opportunity').first().json;\nconst inp = $input.first().json || {};\nconst opportunity_id = base.opportunity_id || (inp.opportunity && inp.opportunity.id) || null;\nif (!opportunity_id) throw new Error('No Capsule opportunity id. Response was: ' + JSON.stringify(inp).slice(0, 300));\nreturn [{ json: { ...base, opportunity_id } }];"
+      },
+      "id": "35652bdc-8024-4b39-8318-0289a83922dd",
+      "name": "Resolve opportunity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4140,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.settings.capsule_base }}/opportunities/{{ $json.opportunity_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ opportunity: { tags: $json.tags.map(name => ({ name })) } }) }}"
+      },
+      "id": "055eb214-93df-4e7d-993b-5414d5372e2b",
+      "name": "Capsule: tag opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4360,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Resolve opportunity').first().json.settings.capsule_base }}/entries",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entry: { type: 'note', party: { id: $('Resolve opportunity').first().json.party_id }, opportunity: { id: $('Resolve opportunity').first().json.opportunity_id }, content: $('Resolve opportunity').first().json.note } }) }}"
+      },
+      "id": "e69f457c-857c-4992-872a-8f350cd9443a",
+      "name": "Capsule: add note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4580,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "connections": {
+    "Booking form (POST /book)": {
+      "main": [
+        [
+          {
+            "node": "Normalise and validate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalise and validate": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject (400)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Pick host and booking page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick host and booking page": {
+      "main": [
+        [
+          {
+            "node": "Reply with booking page (200)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply with booking page (200)": {
+      "main": [
+        [
+          {
+            "node": "Capsule: search person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: search person": {
+      "main": [
+        [
+          {
+            "node": "Match person by email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match person by email": {
+      "main": [
+        [
+          {
+            "node": "Person found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Person found?": {
+      "main": [
+        [
+          {
+            "node": "Resolve person",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capsule: create person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: create person": {
+      "main": [
+        [
+          {
+            "node": "Resolve person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve person": {
+      "main": [
+        [
+          {
+            "node": "Capsule: list opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: list opportunities": {
+      "main": [
+        [
+          {
+            "node": "Capsule: list milestones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: list milestones": {
+      "main": [
+        [
+          {
+            "node": "Decide opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide opportunity": {
+      "main": [
+        [
+          {
+            "node": "Create opportunity?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create opportunity?": {
+      "main": [
+        [
+          {
+            "node": "Capsule: create opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: create opportunity": {
+      "main": [
+        [
+          {
+            "node": "Resolve opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve opportunity": {
+      "main": [
+        [
+          {
+            "node": "Capsule: tag opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: tag opportunity": {
+      "main": [
+        [
+          {
+            "node": "Capsule: add note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

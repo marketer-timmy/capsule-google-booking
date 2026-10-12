@@ -1,0 +1,779 @@
+{
+  "name": "Capsule booking: 2 Calendar watcher (Google events to Capsule)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Calendar watcher\nGoogle's booking page has no webhook and no redirect, so this workflow watches each host's calendar instead. Every two minutes it asks Google for events updated since the last run, keeps the ones with an outside guest, and writes them into Capsule: the person is found or created, the open opportunity moves to *Meeting Booked* (or is created there), a `booking:<type>` tag goes on, and a note records the time, the Meet link, the booking form answers and the event id. Cancellations add a `booking:cancelled` tag and a note.\n\n**Set up**\n1. Credential **Google Calendar OAuth2** on the Google node. For several hosts, either sign in as an account that can read every host calendar, or share each host's calendar with that account (see-all-details), or create a service account with domain-wide delegation and swap the credential.\n2. Credential **Header Auth** for Capsule: name `Authorization`, value `Bearer <token>`.\n3. Edit the **Settings** node: hosts and calendar ids, pipeline and milestone names, your own email domain(s), time zone.\n4. Run once by hand, then activate.\n\nSeen events are remembered in workflow static data (event id plus its `updated` stamp), so edits and reschedules are picked up and nothing is written twice. If a Google call fails, the window is not advanced, so nothing is missed.",
+        "height": 560,
+        "width": 560,
+        "color": 1
+      },
+      "id": "82ba7bb5-c02e-4cc3-b393-fb443adfa8d5",
+      "name": "Sticky Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Google\nOne request per host calendar. `updatedMin` with a ten-minute overlap, `showDeleted` so cancellations arrive too.",
+        "height": 100,
+        "width": 660,
+        "color": 7
+      },
+      "id": "3d6bbb4b-ab94-4752-8829-958abaac1150",
+      "name": "Sticky Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        620,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Person\nGuests who booked from a stray direct link (no form) still land in Capsule, tagged `src:calendar-direct`.",
+        "height": 100,
+        "width": 740,
+        "color": 7
+      },
+      "id": "47345876-bf39-4f92-bf95-65f21d004586",
+      "name": "Sticky Note 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "### Opportunity and record\nMove forward only from *New* or *Contacted*, never backwards. Then the note. The optional last node posts to your own conversions endpoint.",
+        "height": 100,
+        "width": 1400,
+        "color": 7
+      },
+      "id": "aecd07c1-cbd7-4ca1-911d-ede38d4bc288",
+      "name": "Sticky Note 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "0550982e-b6d4-411f-bcdd-6cb8b2ab1a1c",
+      "name": "Every 2 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// EDIT THIS NODE. One item per host comes out, each carrying the shared settings.\nconst settings = {\n  capsule_base: 'https://api.capsulecrm.com/api/v2',\n  pipeline_name: 'Enquiries',\n  booked_milestone_name: 'Meeting Booked',\n  move_from_milestones: ['New', 'Contacted'],   // only move forward from these\n  timezone: 'Pacific/Auckland',\n  internal_domains: ['example.co.nz'],           // attendees here are staff, not guests\n  summary_match: [],                             // e.g. ['Discovery', 'Strategy'] to ignore every other meeting\n  meeting_types: { discovery: { match: 'Discovery' }, strategy: { match: 'Strategy' } },\n  tag_prefix: 'booking',\n  first_run_lookback_hours: 24,\n  overlap_minutes: 10,\n  conversion_webhook: '',                        // optional: your own endpoint for server-side conversions\n  hosts: [\n    { name: 'Host One', email: 'one@example.co.nz', calendar_id: 'one@example.co.nz' },\n    // { name: 'Host Two', email: 'two@example.co.nz', calendar_id: 'two@example.co.nz' },\n  ],\n};\nconst sd = $getWorkflowStaticData('global');\nconst now = new Date();\nconst since = sd.last_run\n  ? new Date(new Date(sd.last_run).getTime() - settings.overlap_minutes * 60000)\n  : new Date(now.getTime() - settings.first_run_lookback_hours * 3600000);\nreturn settings.hosts.map(h => ({ json: { ...h, settings, updated_min: since.toISOString(), run_started: now.toISOString() } }));"
+      },
+      "id": "76b0f292-2fba-40ee-ad4d-978ec01c2d45",
+      "name": "Settings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($json.calendar_id) }}/events?updatedMin={{ encodeURIComponent($json.updated_min) }}&singleEvents=true&showDeleted=true&maxResults=250",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api"
+      },
+      "id": "c36d6f12-8842-43b9-87c9-cfc8f9feebc8",
+      "name": "Google: events updated since last run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1060,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pairs each Google response with its host by position, keeps events that have an\n// outside guest, and skips anything already seen at the same `updated` stamp.\nconst hosts = $('Settings').all().map(i => i.json);\nconst responses = $input.all();\nconst sd = $getWorkflowStaticData('global');\nsd.processed = sd.processed || {};\nconst out = [];\nlet anyError = false;\nresponses.forEach((item, idx) => {\n  const host = hosts[idx];\n  if (!host) return;\n  if (item.json.error) { anyError = true; return; }\n  const st = host.settings;\n  const internalDomains = (st.internal_domains || []).map(d => String(d).toLowerCase());\n  const isInternal = addr => {\n    const a = String(addr || '').toLowerCase();\n    if (!a || a === host.email.toLowerCase()) return true;\n    return internalDomains.includes(a.split('@')[1] || '');\n  };\n  for (const ev of (item.json.items || [])) {\n    const summary = ev.summary || '';\n    if (st.summary_match && st.summary_match.length\n        && !st.summary_match.some(m => summary.toLowerCase().includes(String(m).toLowerCase()))) continue;\n    const guests = (ev.attendees || []).filter(a => a.email && !a.resource && !isInternal(a.email));\n    if (!guests.length) continue;\n    if (sd.processed[ev.id] === ev.updated) continue;\n    sd.processed[ev.id] = ev.updated;\n    const g = guests[0];\n    out.push({ json: {\n      action: ev.status === 'cancelled' ? 'cancelled' : 'booked',\n      event_id: ev.id,\n      updated: ev.updated,\n      summary,\n      start: (ev.start && (ev.start.dateTime || ev.start.date)) || '',\n      end: (ev.end && (ev.end.dateTime || ev.end.date)) || '',\n      link: ev.htmlLink || '',\n      meet: ev.hangoutLink || '',\n      description: String(ev.description || '').slice(0, 1500),\n      guest_email: g.email.toLowerCase(),\n      guest_name: g.displayName || '',\n      guest_response: g.responseStatus || '',\n      host: { name: host.name, email: host.email },\n      settings: st,\n    }});\n  }\n});\nconst cutoff = Date.now() - 60 * 86400000;\nfor (const [id, upd] of Object.entries(sd.processed)) {\n  if (new Date(upd).getTime() < cutoff) delete sd.processed[id];\n}\nif (!anyError && hosts[0]) sd.last_run = hosts[0].run_started;\nreturn out;"
+      },
+      "id": "fb3080a6-182a-4477-9fd9-10f9b2a93a17",
+      "name": "Find new bookings and cancellations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.settings.capsule_base }}/parties/search?q={{ encodeURIComponent($json.guest_email) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "baa60845-9dcc-40a9-8c13-b8c5ce428055",
+      "name": "Capsule: search person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1500,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Exact email match or nothing. A guest who booked from a direct link still gets a record.\nconst ev = $('Find new bookings and cancellations').item.json;\nconst res = $input.item.json || {};\nconst parties = Array.isArray(res.parties) ? res.parties : [];\nconst match = parties.find(p => (p.emailAddresses || []).some(e => (e.address || '').toLowerCase() === ev.guest_email));\nconst parts = (ev.guest_name || ev.guest_email.split('@')[0]).trim().split(/\\s+/);\nconst create_body = { party: {\n  type: 'person',\n  firstName: parts[0] || ev.guest_email,\n  lastName: parts.slice(1).join(' ') || undefined,\n  emailAddresses: [{ type: 'Work', address: ev.guest_email }],\n  tags: [{ name: 'form:booking' }, { name: 'src:calendar-direct' }],\n}};\nreturn { json: { ...ev, party_id: match ? match.id : null, create_body } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "a95b9666-1219-48c2-bda9-5adfb3ad3b38",
+      "name": "Match person",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "42c8b92e-5a57-4cdf-939a-eb8268e0eba8",
+              "leftValue": "={{ !!$json.party_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "55690d25-3c41-405f-b708-35f061b97ab0",
+      "name": "Person found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.capsule_base }}/parties",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.create_body) }}"
+      },
+      "id": "2a89c54c-40a6-47f3-9c79-efb6679b2141",
+      "name": "Capsule: create person",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        480
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "const base = $('Match person').item.json;\nconst inp = $input.item.json || {};\nconst party_id = base.party_id || (inp.party && inp.party.id) || null;\nif (!party_id) throw new Error('No Capsule person id. Response was: ' + JSON.stringify(inp).slice(0, 300));\nreturn { json: { ...base, party_id } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "d43f66dc-2ec7-4676-9c10-fc68fa8e4b49",
+      "name": "Resolve person",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.settings.capsule_base }}/parties/{{ $json.party_id }}/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "e207caff-eb97-4c7b-bd17-6d355b90270a",
+      "name": "Capsule: list opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Resolve person').item.json.settings.capsule_base }}/milestones?perPage=100",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "78b7d021-6fd0-4572-9e10-4a738ed04da7",
+      "name": "Capsule: list milestones",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2820,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Which opportunity, which milestone, which tags, and the note text.\nconst ev = $('Resolve person').item.json;\nconst st = ev.settings;\nconst opps = ($('Capsule: list opportunities').item.json || {}).opportunities || [];\nconst milestones = ($input.item.json || {}).milestones || [];\nconst inPipeline = m => !m.pipeline || !st.pipeline_name\n  || (m.pipeline.name || '').toLowerCase() === st.pipeline_name.toLowerCase();\nconst pipelineMs = milestones.filter(inPipeline);\nconst booked = pipelineMs.find(m => (m.name || '').toLowerCase() === st.booked_milestone_name.toLowerCase());\nconst ids = new Set(pipelineMs.map(m => m.id));\nconst open = opps\n  .filter(o => !o.closedOn && (!o.milestone || ids.size === 0 || ids.has(o.milestone.id)))\n  .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0];\nconst typeEntry = Object.entries(st.meeting_types || {})\n  .find(([k, v]) => ev.summary.toLowerCase().includes(String(v.match || k).toLowerCase()));\nconst typeKey = typeEntry ? typeEntry[0] : 'meeting';\nconst tags = [ev.action === 'cancelled' ? `${st.tag_prefix}:cancelled` : `${st.tag_prefix}:${typeKey}`];\nconst when = ev.start\n  ? new Date(ev.start).toLocaleString('en-NZ', { timeZone: st.timezone || 'UTC', dateStyle: 'full', timeStyle: 'short' })\n  : 'unknown time';\nconst lines = ev.action === 'cancelled'\n  ? [`Meeting cancelled: ${ev.summary}`, `Was: ${when}`, `Host: ${ev.host.name}`, `Event id: ${ev.event_id}`]\n  : [`Meeting booked: ${ev.summary}`, `When: ${when}`, `Host: ${ev.host.name}`,\n     ev.meet ? `Meet: ${ev.meet}` : null, ev.link ? `Calendar: ${ev.link}` : null,\n     ev.description ? `Booking form answers:\\n${ev.description}` : null, `Event id: ${ev.event_id}`];\nconst note = lines.filter(Boolean).join('\\n');\nconst create_opportunity = ev.action === 'booked' && !open;\nif (create_opportunity && !booked) throw new Error(`No milestone \"${st.booked_milestone_name}\" in pipeline \"${st.pipeline_name}\". See capsule/SCHEMA.md.`);\nconst fromOk = !open || !open.milestone\n  || (st.move_from_milestones || []).map(x => String(x).toLowerCase()).includes(String(open.milestone.name || '').toLowerCase());\nconst canMove = !!(open && booked && ev.action === 'booked' && fromOk);\nconst update_body = open\n  ? { opportunity: { ...(canMove ? { milestone: { id: booked.id } } : {}), tags: tags.map(name => ({ name })) } }\n  : null;\nconst create_body = create_opportunity\n  ? { opportunity: { party: { id: ev.party_id }, name: `${ev.guest_name || ev.guest_email} - ${ev.summary}`.slice(0, 100),\n      milestone: { id: booked.id }, tags: tags.map(name => ({ name })) } }\n  : null;\nreturn { json: { ...ev, opportunity_id: open ? open.id : null, create_opportunity,\n  opportunity_create_body: create_body, opportunity_update_body: update_body, note, tags, meeting_type: typeKey } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "2e4d30f1-ad56-4762-9aae-363b88043ce4",
+      "name": "Decide update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "16c9d1f1-80f4-467d-98d3-751ca29aca3f",
+              "leftValue": "={{ $json.create_opportunity }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9b36f53e-aaab-4a0a-aa6c-40a7865593bc",
+      "name": "Create opportunity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.settings.capsule_base }}/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.opportunity_create_body) }}"
+      },
+      "id": "3747b89e-ec69-4b60-958d-f76cb07057f7",
+      "name": "Capsule: create opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3480,
+        140
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// A cancellation with no open opportunity is fine: the note goes on the person instead.\nconst base = $('Decide update').item.json;\nconst inp = $input.item.json || {};\nconst opportunity_id = base.opportunity_id || (inp.opportunity && inp.opportunity.id) || null;\nreturn { json: { ...base, opportunity_id } };",
+        "mode": "runOnceForEachItem"
+      },
+      "id": "f00ffbcd-ac3a-457e-be51-e17e617bb16e",
+      "name": "Resolve opportunity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "38a00a55-a97a-4488-a22c-143623394b49",
+              "leftValue": "={{ !!$json.opportunity_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "641ee27c-b822-41b0-9965-c3523e6b212e",
+      "name": "Has opportunity?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.settings.capsule_base }}/opportunities/{{ $json.opportunity_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.opportunity_update_body || { opportunity: { tags: $json.tags.map(name => ({ name })) } }) }}"
+      },
+      "id": "40be7541-0888-4d79-8d48-6db8e168816a",
+      "name": "Capsule: update opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4140,
+        200
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Resolve opportunity').item.json.settings.capsule_base }}/entries",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ entry: { type: 'note', party: { id: $('Resolve opportunity').item.json.party_id }, opportunity: $('Resolve opportunity').item.json.opportunity_id ? { id: $('Resolve opportunity').item.json.opportunity_id } : undefined, content: $('Resolve opportunity').item.json.note } }) }}"
+      },
+      "id": "9ec1073c-abbc-4598-b4b4-07b556544cc0",
+      "name": "Capsule: add note",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4360,
+        300
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Resolve opportunity').item.json.settings.conversion_webhook }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: $('Resolve opportunity').item.json.action, meeting_type: $('Resolve opportunity').item.json.meeting_type, event_id: $('Resolve opportunity').item.json.event_id, start: $('Resolve opportunity').item.json.start, host: $('Resolve opportunity').item.json.host.email }) }}"
+      },
+      "id": "dce5fa59-cdd1-4263-97e3-0660f45c55b4",
+      "name": "Conversion ping (optional)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4580,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "disabled": true
+    }
+  ],
+  "connections": {
+    "Every 2 minutes": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Google: events updated since last run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google: events updated since last run": {
+      "main": [
+        [
+          {
+            "node": "Find new bookings and cancellations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find new bookings and cancellations": {
+      "main": [
+        [
+          {
+            "node": "Capsule: search person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: search person": {
+      "main": [
+        [
+          {
+            "node": "Match person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match person": {
+      "main": [
+        [
+          {
+            "node": "Person found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Person found?": {
+      "main": [
+        [
+          {
+            "node": "Resolve person",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capsule: create person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: create person": {
+      "main": [
+        [
+          {
+            "node": "Resolve person",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve person": {
+      "main": [
+        [
+          {
+            "node": "Capsule: list opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: list opportunities": {
+      "main": [
+        [
+          {
+            "node": "Capsule: list milestones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: list milestones": {
+      "main": [
+        [
+          {
+            "node": "Decide update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide update": {
+      "main": [
+        [
+          {
+            "node": "Create opportunity?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create opportunity?": {
+      "main": [
+        [
+          {
+            "node": "Capsule: create opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: create opportunity": {
+      "main": [
+        [
+          {
+            "node": "Resolve opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve opportunity": {
+      "main": [
+        [
+          {
+            "node": "Has opportunity?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has opportunity?": {
+      "main": [
+        [
+          {
+            "node": "Capsule: update opportunity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Capsule: add note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: update opportunity": {
+      "main": [
+        [
+          {
+            "node": "Capsule: add note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capsule: add note": {
+      "main": [
+        [
+          {
+            "node": "Conversion ping (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
