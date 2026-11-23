@@ -1,6 +1,6 @@
 # Lesson plan: free booking that keeps the click
 
-Google appointment schedules and Capsule CRM, wired so that every booking lands in the CRM with the ad or link that caused it. Two tracks: one for a single person with nothing to install, one for a team with n8n. The repository this sits in has everything both tracks need.
+Google appointment schedules and Capsule CRM, wired so that every booking lands in the CRM with the ad or link that caused it. Two main tracks: one for a single person with nothing to install, one for a team with n8n. Track C, near the end, is Track A with Cal.com in place of Google's booking page. The repository this sits in has everything all three need.
 
 ## Who this is for
 
@@ -196,6 +196,42 @@ curl -s -X POST "https://YOUR-N8N/webhook/book" -H "Content-Type: application/js
 5. **Switch off the old tool** when the 30 days are up and the catch-net has caught nothing for a fortnight. Export its history first.
 
 **Check.** Count bookings on the calendars for a week and count opportunities that reached Meeting Booked in Capsule. They should match.
+
+---
+
+## Track C: solo, with Cal.com
+
+Take this track instead of Track A if you want the visitor to type their name once, want more than one booking link without a Google upgrade, or already use Cal.com. Do Module 1 first. Skip Module 2: Cal.com replaces Google's booking page.
+
+### Module C1: Cal.com booking links (10 minutes)
+
+1. Sign in to Cal.com and connect the calendar it should check for clashes and write bookings to.
+2. Make one booking link per meeting type, for example a ten-minute and a forty-minute one.
+3. Write down each link's slug, the part of its address after your username.
+
+**Check:** each link opens in a private window and shows your real free times.
+
+### Module C2: The script and the webhook (15 minutes)
+
+1. script.google.com, New project. Replace `Code.gs` with `cal/Code.gs`. In Project Settings tick "Show appsscript.json" and replace it with `cal/appsscript.json`.
+2. Script Properties: `CAPSULE_TOKEN`, `FORM_SECRET` and `WEBHOOK_KEY`. The last two are long random strings you make up.
+3. Edit `CONFIG`: the milestone names, the time zone, and each meeting type's `slug` from Module C1.
+4. Run `setup()` and approve the one permission it asks for. Run `testBooking()`.
+5. Deploy, New deployment, Web app, execute as Me, access Anyone. Copy the `/exec` URL.
+6. In Cal.com: Settings, Developer, Webhooks, New. Subscriber URL is the `/exec` URL followed by `?key=` and your `WEBHOOK_KEY`. Tick Booking created, Booking rescheduled and Booking cancelled.
+
+**Check:** after `testBooking()`, Capsule has a person called Test Booking with an opportunity at Meeting Booked and two notes. Delete them when you have looked.
+
+### Module C3: The page (15 minutes)
+
+1. Put `form/book-cal.html` on your site at `/book/`.
+2. Set `SCRIPT_URL`, `FORM_SECRET` and `CAL_LINKS`. Each link is written `yourname/slug`, with no domain.
+3. Open `/book/?utm_source=test&utm_campaign=lesson`, fill in the form and book a slot.
+4. Reschedule from the confirmation email, then cancel.
+
+**Check:** the Cal.com form already holds your name and email. Capsule shows the opportunity at Meeting Booked, a note with the time and call link, a second note after the reschedule, and a `booking:cancelled` tag after the cancel. The first note carries `utm_source: test`.
+
+If the booking does not arrive, open the script's Executions list. A run that ends in "bad key" means the webhook URL and the `WEBHOOK_KEY` property differ.
 
 ---
 
