@@ -6,6 +6,7 @@ All notable changes to this project are recorded here. The format follows [Keep 
 
 ### Added
 
+- Track C: Cal.com's free plan as the slot picker for one person. `cal/Code.gs` receives the booking form and Cal.com's booking webhooks in one Apps Script web app, with no calendar watcher. `form/book-cal.html` embeds the Cal.com booking page with the name, email and a booking key filled in. Checked against a simulated Capsule and a public Cal.com link; not yet run with a real Cal.com webhook.
 - README: "The tools it runs on", with disclosed affiliate links to Capsule CRM and n8n through the author's disclosure pages.
 
 ## [0.1.0] - 2026-10-12
